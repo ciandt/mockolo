@@ -698,9 +698,6 @@ extension Trivia {
                     let val = subStr.arguments(with: .annotationArgDelimiter)
                     ret.module = val?[.prefix]
                 }
-                if argsStr.contains(String.rxColon), let subStr = argsStr.components(separatedBy: String.rxColon).last, !subStr.isEmpty {
-                    ret.varTypes = subStr.arguments(with: .annotationArgDelimiter)
-                }
                 if argsStr.contains(String.varColon), let subStr = argsStr.components(separatedBy: String.varColon).last, !subStr.isEmpty {
                     if let val = subStr.arguments(with: .annotationArgDelimiter) {
                         if ret.varTypes == nil {

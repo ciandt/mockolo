@@ -252,28 +252,6 @@ public class FooMock: Foo {
 }
 ```
 
-
-For a var type such as an RxSwift observable:
-
-```swift
-/// @mockable(rx: intStream = ReplaySubject; doubleStream = BehaviorSubject)
-public protocol Foo {
-    var intStream: Observable<Int> { get }
-    var doubleStream: Observable<Double> { get }
-}
-```
-
-This will generate: 
-
-```swift
-public class FooMock: Foo {
-    var intStreamSubject = ReplaySubject<Int>.create(bufferSize: 1)
-    var intStream: Observable<Int> { /* use intStreamSubject */ }
-    var doubleStreamSubject = BehaviorSubject<Int>(value: 0)
-    var doubleStream: Observable<Int> { /* use doubleStreamSubject */ }
-}
-```
-
 To capture function arguments history:
 
 ```swift

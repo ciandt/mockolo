@@ -123,9 +123,6 @@ class Executor {
         useTemplateFunc = parser.add(option: "--use-template-func",
                                  kind: Bool.self,
                                  usage: "If set, a common template function will be called from all functions in mock classes (default is set to false).")
-        useMockObservable = parser.add(option: "--use-mock-observable",
-                                 kind: Bool.self,
-                                 usage: "If set, a property wrapper will be used to mock RxSwift Observable variables (default is set to false).")
         mockAll = parser.add(option: "--mock-all",
                                  kind: Bool.self,
                                  usage: "If set, it will mock all types (protocols and classes) with a mock annotation (default is set to false and only mocks protocols with a mock annotation).")

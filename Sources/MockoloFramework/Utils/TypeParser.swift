@@ -40,10 +40,6 @@ public final class Type {
         return typeName.hasPrefix(String.autoclosure)
     }
 
-    var isRxObservable: Bool {
-        return typeName.hasPrefix(.rxObservableLeftAngleBracket) || typeName.hasPrefix(.observableLeftAngleBracket)
-    }
-
     var isUnknown: Bool {
         return typeName.isEmpty || typeName == String.unknownVal
     }
@@ -339,17 +335,6 @@ public final class Type {
             return val
         }
 
-        let (subjectType, typeParam, subjectVal) = parseRxVar(overrides: overrides, overrideKey: overrideKey, isInitParam: isInitParam)
-        if subjectType != nil {
-            let prefix = typeName.hasPrefix(String.rxObservableLeftAngleBracket) ? String.rxObservableLeftAngleBracket : String.observableLeftAngleBracket
-            var rxEmpty = String.observableEmpty
-            if let t = typeParam {
-                rxEmpty = "\(prefix)\(t)>.empty()"
-            }
-            cachedDefaultVal = isInitParam ? subjectVal : rxEmpty
-            return cachedDefaultVal
-        }
-
         if let val = parseDefaultVal(isInitParam: isInitParam) {
             cachedDefaultVal = val
             return cachedDefaultVal
@@ -360,41 +345,6 @@ public final class Type {
             return val
         }
         return nil
-    }
-
-    func parseRxVar(overrides: [String: String]?, overrideKey: String, isInitParam: Bool) -> (String?, String?, String?) {
-        if typeName.hasPrefix(String.observableLeftAngleBracket) || typeName.hasPrefix(String.rxObservableLeftAngleBracket),
-            let range = typeName.range(of: String.observableLeftAngleBracket), let lastIdx = typeName.lastIndex(of: ">") {
-            let typeParamStr = typeName[range.upperBound..<lastIdx]
-
-            var subjectKind = ""
-            var underlyingSubjectType = ""
-            if let overrideTypes = overrides {
-                if let val = overrideTypes[overrideKey], val.hasSuffix(String.subjectSuffix) {
-                    subjectKind = val
-                } else if let val = overrideTypes["all"], val.hasSuffix(String.subjectSuffix) {
-                    subjectKind = val
-                }
-            }
-
-            if subjectKind.isEmpty {
-                subjectKind = String.publishSubject
-            }
-            underlyingSubjectType = "\(subjectKind)<\(typeParamStr)>"
-
-            var underlyingSubjectTypeDefaultVal: String? = nil
-            if subjectKind == String.publishSubject {
-                underlyingSubjectTypeDefaultVal = "\(underlyingSubjectType)()"
-            } else if subjectKind == String.replaySubject {
-                underlyingSubjectTypeDefaultVal = "\(underlyingSubjectType)\(String.replaySubjectCreate)"
-            } else if subjectKind == String.behaviorSubject {
-                if let val = Type(String(typeParamStr)).defaultSingularVal(isInitParam: isInitParam, overrides: overrides, overrideKey: overrideKey) {
-                    underlyingSubjectTypeDefaultVal = "\(underlyingSubjectType)(value: \(val))"
-                }
-            }
-            return (underlyingSubjectType, String(typeParamStr), underlyingSubjectTypeDefaultVal)
-        }
-        return (nil, nil, nil)
     }
 
     private func parseDefaultVal(isInitParam: Bool) -> String? {
@@ -448,8 +398,6 @@ public final class Type {
                 let sub = String(arg.typeName[arg.typeName.startIndex..<idx])
                 if bracketPrefixTypes.contains(sub) {
                     return "\(arg.typeName)()"
-                } else if let val = rxTypes[sub], let suffix = val {
-                    return "\(arg.typeName)\(suffix)"
                 } else {
                     return nil
                 }
@@ -623,12 +571,6 @@ public final class Type {
     public static var customTypeMap: [String: String]?
 
     private let bracketPrefixTypes = ["Array", "Set", "Dictionary"]
-    private let rxTypes = [String.publishSubject : "()",
-                           String.replaySubject : String.replaySubjectCreate,
-                           String.behaviorSubject : nil,
-                           String.behaviorRelay: nil,
-                           String.observableLeftAngleBracket: String.empty,
-                           String.rxObservableLeftAngleBracket: String.empty]
 
     enum BracketType {
         case angle

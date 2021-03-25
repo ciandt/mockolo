@@ -18,7 +18,6 @@ import Foundation
 
 extension Data {
     static public let typealiasColon = String.typealiasColon.data(using: String.Encoding.utf8)
-    static public let rxColon = String.rxColon.data(using: String.Encoding.utf8)
 
     public func sliced(offset: Int64, length: Int64) -> Data? {
         guard offset >= 0, length > 0 else { return nil }

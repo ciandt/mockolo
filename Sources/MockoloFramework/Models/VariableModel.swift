@@ -78,19 +78,7 @@ final class VariableModel: Model {
             }
             return nil
         }
-
-        if let rxVar = applyRxVariableTemplate(name: identifier,
-                                               type: type,
-                                               encloser: encloser,
-                                               overrideTypes: overrideTypes,
-                                               shouldOverride: shouldOverride,
-                                               useMockObservable: useMockObservable,
-                                               allowSetCallCount: allowSetCallCount,
-                                               isStatic: isStatic,
-                                               accessLevel: accessLevel) {
-            return rxVar
-        }
-
+        
         return applyVariableTemplate(name: identifier,
                                      type: type,
                                      encloser: encloser,
