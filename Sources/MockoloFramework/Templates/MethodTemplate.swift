@@ -54,6 +54,7 @@ extension MethodModel {
             guard let handler = handler else { return "" }
             
             let callCount = "\(identifier)\(String.callCountSuffix)"
+            let callCountQueue = "\(callCount)Queue"
             let handlerVarName = "\(identifier)\(String.handlerSuffix)"
             let handlerVarType = handler.type.typeName // ?? "Any"
             let handlerReturn = handler.render(with: identifier, encloser: "") ?? ""
@@ -91,7 +92,7 @@ extension MethodModel {
 
             if body.isEmpty {
                 body = """
-                \(2.tab)\(callCount) += 1
+                \(2.tab)\(callCountQueue).sync { \(callCount) += 1 }
                 """
                 
                 if let argsHistory = argsHistory, argsHistory.enable(force: enableFuncArgsHistory) {
@@ -124,6 +125,7 @@ extension MethodModel {
             
             template = """
 
+            \(1.tab)private var \(callCountQueue) = DispatchQueue(label: "com.mockolo.\(callCount)")
             \(1.tab)\(acl)\(staticStr)\(privateSetSpace)var \(callCount) = 0
             """
             
