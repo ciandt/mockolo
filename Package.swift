@@ -1,12 +1,18 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.4
 import PackageDescription
 
 var dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/apple/swift-argument-parser", .upToNextMinor(from: "0.0.4")),
-    .package(url: "https://github.com/apple/swift-tools-support-core.git", .exact("0.1.5")),
+    .package(url: "https://github.com/apple/swift-tools-support-core.git", .exact("0.2.3")),
+    .package(url: "https://github.com/apple/swift-argument-parser", .exact("1.0.1")),
 ]
 
-dependencies.append(.package(name: "SwiftSyntax", url: "https://github.com/apple/swift-syntax.git", .branch("swift-5.3-RELEASE")))
+let swiftSyntax: Package.Dependency
+#if swift(>=5.5)
+swiftSyntax = .package(name: "SwiftSyntax", url: "https://github.com/apple/swift-syntax.git", .exact("0.50500.0"))
+#else
+swiftSyntax = .package(name: "SwiftSyntax", url: "https://github.com/apple/swift-syntax.git", .exact("0.50400.0"))
+#endif
+dependencies.append(swiftSyntax)
 
 let package = Package(
     name: "Mockolo",
@@ -19,12 +25,12 @@ let package = Package(
         ],
     dependencies: dependencies,
     targets: [
-        .target(
+        .executableTarget(
             name: "Mockolo",
             dependencies: [
                 "MockoloFramework",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 ]),
         .target(
             name: "MockoloFramework",

@@ -4,18 +4,20 @@ final class VariableModel: Model {
     var name: String
     var type: Type
     var offset: Int64
-    var length: Int64
     let accessLevel: String
     let attributes: [String]?
+    let encloserType: DeclType
     var canBeInitParam: Bool
     let processed: Bool
-    var data: Data? = nil
     var filePath: String = ""
     var isStatic = false
     var shouldOverride = false
-    var overrideTypes: [String: String]?
-    var cachedDefaultTypeVal: String?
+    var rxTypes: [String: String]?
+    var customModifiers: [String: Modifier]?
     var modelDescription: String? = nil
+    var combineType: CombineType?
+    var wrapperAliasModel: VariableModel?
+    var propertyWrapper: String?
     var modelType: ModelType {
         return .variable
     }
@@ -39,50 +41,58 @@ final class VariableModel: Model {
          isStatic: Bool,
          canBeInitParam: Bool,
          offset: Int64,
-         length: Int64,
-         overrideTypes: [String: String]?,
+         rxTypes: [String: String]?,
+         customModifiers: [String: Modifier]?,
          modelDescription: String?,
+         combineType: CombineType?,
          processed: Bool) {
         self.name = name.trimmingCharacters(in: .whitespaces)
         self.type = Type(typeName.trimmingCharacters(in: .whitespaces))
         self.offset = offset
-        self.length = length
         self.isStatic = isStatic
         self.shouldOverride = encloserType == .classType
         self.canBeInitParam = canBeInitParam
         self.processed = processed
-        self.overrideTypes = overrideTypes
+        self.rxTypes = rxTypes
+        self.customModifiers = customModifiers
         self.accessLevel = acl ?? ""
         self.attributes = nil
+        self.encloserType = encloserType
         self.modelDescription = modelDescription
+        self.combineType = combineType
     }
     
     func render(with identifier: String, encloser: String, useTemplateFunc: Bool = false, useMockObservable: Bool = false, allowSetCallCount: Bool = false, mockFinal: Bool = false, enableFuncArgsHistory: Bool = false) -> String? {
         if processed {
-            var prefix = ""
-            if shouldOverride, !name.isGenerated(type: type) {
-                prefix = "\(String.override) "
+            guard let modelDescription = modelDescription?.trimmingCharacters(in: .newlines), !modelDescription.isEmpty else {
+                return nil
             }
-            if let modelDescription = modelDescription?.trimmingCharacters(in: .newlines), !modelDescription.isEmpty {
+
+            var prefix = ""
+            if let propertyWrapper = propertyWrapper, !modelDescription.contains(propertyWrapper) {
+                prefix = "\(propertyWrapper) "
+            }
+            if shouldOverride, !name.isGenerated(type: type) {
+                prefix += "\(String.override) "
+            }
+
                 return prefix + modelDescription
             }
             
-            if let ret = self.data?.toString(offset: self.offset, length: self.length) {
-                if !ret.contains(identifier),
-                    let first = ret.components(separatedBy: CharacterSet(arrayLiteral: ":", "=")).first,
-                    let found = first.components(separatedBy: " ").filter({!$0.isEmpty}).last {
-                    let replaced = ret.replacingOccurrences(of: found, with: identifier)
-                    return prefix + replaced
+        if let combineVar = applyCombineVariableTemplate(name: identifier,
+                                                         type: type,
+                                                         encloser: encloser,
+                                                         shouldOverride: shouldOverride,
+                                                         isStatic: isStatic,
+                                                         accessLevel: accessLevel) {
+            return combineVar
                 }
-                return prefix + ret
-            }
-            return nil
-        }
-        
+
         return applyVariableTemplate(name: identifier,
                                      type: type,
                                      encloser: encloser,
                                      isStatic: isStatic,
+                                     customModifiers: customModifiers,
                                      allowSetCallCount: allowSetCallCount,
                                      shouldOverride: shouldOverride,
                                      accessLevel: accessLevel)

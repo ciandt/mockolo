@@ -1,6 +1,6 @@
 # ![](Images/logo.png)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2964/badge)](https://bestpractices.coreinfrastructure.org/projects/2964)
-[![Build Status](https://travis-ci.com/uber/mockolo.svg?token=xLqK5hKgjQBvRErSp7Wk&branch=master)](https://travis-ci.com/uber/mockolo.svg?token=xLqK5hKgjQBvRErSp7Wk&branch=master)
+[![Build Status](https://github.com/uber/mockolo/actions/workflows/builds.yml/badge.svg?branch=master)](https://github.com/uber/mockolo/actions/workflows/builds.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![FOSSA Status](https://app.fossa.com/api/projects/custom%2B4458%2Fgithub.com%2Fuber%2Fmockolo.svg?type=shield)](https://app.fossa.com/projects/custom%2B4458%2Fgithub.com%2Fuber%2Fmockolo?ref=badge_shield)
 
@@ -21,9 +21,9 @@ This project may contain unstable APIs which may not be ready for general use. S
 
 ## System Requirements
 
-* Swift 5.2 or later
-* Xcode 11.4 or later
-* MacOS 10.14.6 or later
+* Swift 5.4 or later
+* Xcode 12.5 or later
+* MacOS 11.0 or later
 * Support is included for the Swift Package Manager
 
 
@@ -210,9 +210,12 @@ func testMock() {
 }
 ```
 
+## Arguments
+
 A list of override arguments can be passed in (delimited by a semicolon) to the annotation to set var types, typealiases, module names, etc. 
 
-For a module name:
+
+### Module
 
 ```swift
 /// @mockable(module: prefix = Bar)
@@ -229,7 +232,7 @@ public class FooMock: Bar.Foo {
 }
 ```
 
-For a typealias:
+### Typealias
 
 ```swift
 /// @mockable(typealias: T = AnyObject; U = StringProtocol)
@@ -251,6 +254,9 @@ public class FooMock: Foo {
     ...
 }
 ```
+
+
+### Function Argument History
 
 To capture function arguments history:
 
@@ -292,6 +298,57 @@ public class FooMock: Foo {
 and also, enable the arguments captor for all functions if you passed `--enable-args-history` arg to `mockolo` command.
 > NOTE: The arguments captor only supports singular types (e.g. variable, tuple). The closure variable is not supported.
 
+### Combine's AnyPublisher
+
+To generate mocks for Combine's AnyPublisher:
+
+```swift
+/// @mockable(combine: fooPublisher = PassthroughSubject; barPublisher = CurrentValueSubject)
+public protocol Foo {
+    var fooPublisher: AnyPublisher<String, Never> { get }
+    var barPublisher: AnyPublisher<Int, CustomError> { get }
+}
+```
+
+This will generate:
+
+```swift
+public class FooMock: Foo {
+    public init() { }
+
+    public var fooPublisher: AnyPublisher<String, Never> { return self.fooPublisherSubject.eraseToAnyPublisher() }
+    public private(set) var fooPublisherSubject = PassthroughSubject<String, Never>()
+
+    public var barPublisher: AnyPublisher<Int, CustomError> { return self.barPublisherSubject.eraseToAnyPublisher() }
+    public private(set) var barPublisherSubject = CurrentValueSubject<Int, CustomError>(0)
+}
+```
+
+You can also connect an AnyPublisher to a property within the protocol.
+
+For example:
+```swift
+/// @mockable(combine: fooPublisher = @Published foo)
+public protocol Foo {
+    var foo: String { get }
+    var fooPublisher: AnyPublisher<String, Never> { get }
+}
+```
+
+This will generate:
+```swift
+public class FooMock: Foo {
+    public init() { }
+    public init(foo: String = "") {
+        self.foo = foo
+    }
+
+    public private(set) var fooSetCallCount = 0
+    @Published public var foo: String = "" { didSet { fooSetCallCount += 1 } }
+
+    public var fooPublisher: AnyPublisher<String, Never> { return self.$foo.setFailureType(to: Never.self).eraseToAnyPublisher() }
+}
+```
 
 ## Used libraries
 

@@ -150,14 +150,14 @@ extension MemberDeclListItemSyntax {
         if let varMember = self.decl.as(VariableDeclSyntax.self) {
             if validateMember(varMember.modifiers, declType, processed: processed) {
                 let acl = memberAcl(varMember.modifiers, encloserAcl, declType)
-                if let item = varMember.models(with: acl, declType: declType, overrides: metadata?.varTypes, processed: processed).first {
+                if let item = varMember.models(with: acl, declType: declType, metadata: metadata, processed: processed).first {
                     return (item, varMember.attributes?.trimmedDescription, false)
                 }
             }
         } else if let funcMember = self.decl.as(FunctionDeclSyntax.self) {
             if validateMember(funcMember.modifiers, declType, processed: processed) {
                 let acl = memberAcl(funcMember.modifiers, encloserAcl, declType)
-                let item = funcMember.model(with: acl, declType: declType, funcsWithArgsHistory: metadata?.funcsWithArgsHistory, processed: processed)
+                let item = funcMember.model(with: acl, declType: declType, funcsWithArgsHistory: metadata?.funcsWithArgsHistory, customModifiers: metadata?.modifiers, processed: processed)
                 return (item, funcMember.attributes?.trimmedDescription, false)
             }
         } else if let subscriptMember = self.decl.as(SubscriptDeclSyntax.self) {
@@ -346,7 +346,7 @@ extension ClassDeclSyntax: EntityNode {
 }
 
 extension VariableDeclSyntax {
-    func models(with acl: String, declType: DeclType, overrides: [String: String]?, processed: Bool) -> [Model] {
+    func models(with acl: String, declType: DeclType, metadata: AnnotationMetadata?, processed: Bool) -> [Model] {
         // Detect whether it's static
         var isStatic = false
         if let modifiers = self.modifiers {
@@ -372,9 +372,10 @@ extension VariableDeclSyntax {
                                          isStatic: isStatic,
                                          canBeInitParam: potentialInitParam,
                                          offset: v.offset,
-                                         length: v.length,
-                                         overrideTypes: overrides,
+                                         rxTypes: metadata?.varTypes,
+                                         customModifiers: metadata?.modifiers,
                                          modelDescription: self.description,
+                                         combineType: metadata?.combineTypes?[name] ?? metadata?.combineTypes?["all"],
                                          processed: processed)
             return varmodel
         }
@@ -406,6 +407,7 @@ extension SubscriptDeclSyntax {
                                          offset: self.offset,
                                          length: self.length,
                                          funcsWithArgsHistory: [],
+                                         customModifiers: [:],
                                          modelDescription: self.description,
                                          processed: processed)
         return subscriptModel
@@ -414,7 +416,7 @@ extension SubscriptDeclSyntax {
 
 extension FunctionDeclSyntax {
     
-    func model(with acl: String, declType: DeclType, funcsWithArgsHistory: [String]?, processed: Bool) -> Model {
+    func model(with acl: String, declType: DeclType, funcsWithArgsHistory: [String]?, customModifiers: [String : Modifier]?, processed: Bool) -> Model {
         var isStatic = false
         if let modifiers = self.modifiers {
             isStatic = modifiers.isStatic
@@ -437,6 +439,7 @@ extension FunctionDeclSyntax {
                                     offset: self.offset,
                                     length: self.length,
                                     funcsWithArgsHistory: funcsWithArgsHistory ?? [],
+                                    customModifiers: customModifiers ?? [:],
                                     modelDescription: self.description,
                                     processed: processed)
         return funcmodel
@@ -479,6 +482,7 @@ extension InitializerDeclSyntax {
                            offset: self.offset,
                            length: self.length,
                            funcsWithArgsHistory: [],
+                           customModifiers: [:],
                            modelDescription: self.description,
                            processed: processed)
     }
@@ -681,41 +685,89 @@ extension Trivia {
     // a dictionary: [T: Any, U: AnyObject] which will be used to override inhertied types
     // of typealias decls for T and U.
     private func metadata(with annotation: String, in val: String) -> AnnotationMetadata? {
-        if val.contains(annotation) {
+        guard val.contains(annotation) else {
+            return nil
+        }
+
             let comps = val.components(separatedBy: annotation)
             var ret = AnnotationMetadata()
-            if var argsStr = comps.last, !argsStr.isEmpty {
+
+        guard var argsStr = comps.last, !argsStr.isEmpty else {
+            return ret
+        }
+
                 if argsStr.hasPrefix("(") {
                     argsStr.removeFirst()
                 }
                 if argsStr.hasSuffix(")") {
                     argsStr.removeLast()
                 }
-                if argsStr.contains(String.typealiasColon), let subStr = argsStr.components(separatedBy: String.typealiasColon).last, !subStr.isEmpty {
-                    ret.typeAliases = subStr.arguments(with: .annotationArgDelimiter)
+        if let arguments = parseArguments(argsStr, identifier: .typealiasColon) {
+            ret.typeAliases = arguments
                 }
-                if argsStr.contains(String.moduleColon), let subStr = argsStr.components(separatedBy: String.moduleColon).last, !subStr.isEmpty {
-                    let val = subStr.arguments(with: .annotationArgDelimiter)
-                    ret.module = val?[.prefix]
+        if let arguments = parseArguments(argsStr, identifier: .moduleColon) {
+
+            ret.module = arguments[.prefix]
                 }
-                if argsStr.contains(String.varColon), let subStr = argsStr.components(separatedBy: String.varColon).last, !subStr.isEmpty {
-                    if let val = subStr.arguments(with: .annotationArgDelimiter) {
+        if let arguments = parseArguments(argsStr, identifier: .varColon) {
+
                         if ret.varTypes == nil {
-                            ret.varTypes = val
+                ret.varTypes = arguments
                         } else {
-                            ret.varTypes?.merge(val, uniquingKeysWith: {$1})
+                ret.varTypes?.merge(arguments, uniquingKeysWith: {$1})
                         }
                     }
+        if let arguments = parseArguments(argsStr, identifier: .historyColon) {
+
+            ret.funcsWithArgsHistory = arguments.compactMap { k, v in v == "true" ? k : nil }
                 }
-                if argsStr.contains(String.historyColon), let subStr = argsStr.components(separatedBy: String.historyColon).last, !subStr.isEmpty {
-                    ret.funcsWithArgsHistory = subStr.arguments(with: .annotationArgDelimiter)?.compactMap { k, v in v == "true" ? k : nil }
+        if let arguments = parseArguments(argsStr, identifier: .combineColon) {
+
+            ret.combineTypes = ret.combineTypes ?? [String: CombineType]()
+
+            let currentValueSubjectStr = CombineType.currentValueSubject.typeName.lowercased()
+            for pair in arguments {
+                if pair.value.hasPrefix("@") {
+                    let parts = pair.value.split(separator: " ")
+                    if parts.count == 2 {
+                        ret.combineTypes?[pair.key] = .property(wrapper: String(parts[0]), name: String(parts[1]))
+                        continue
                 }
             }
+
+                if pair.value.lowercased() == currentValueSubjectStr {
+                    ret.combineTypes?[pair.key] = .currentValueSubject
+                } else {
+                    ret.combineTypes?[pair.key] = .passthroughSubject
+                }
+            }
+        }
+        if let arguments = parseArguments(argsStr, identifier: .modifiersColon) {
+
+            var modifiers: [String: Modifier] = [:]
+            for tuple in arguments {
+                guard let modifier: Modifier = Modifier(rawValue: tuple.value) else {
+                    continue
+                }
+                modifiers[tuple.key] = modifier
+            }
+            ret.modifiers = modifiers
+        }
             return ret
         }
+
+    private func parseArguments(_ argsStr: String, identifier: String) -> [String: String]? {
+        guard
+            argsStr.contains(identifier),
+            let subStr = argsStr.components(separatedBy: identifier).last,
+            !subStr.isEmpty
+        else {
         return nil
     }
     
+        return subStr.arguments(with: .annotationArgDelimiter)
+    }
+
     // Looks up an annotation (e.g. /// @mockable) and its arguments if any.
     // See metadata(with:, in:) for more info on the annotation arguments.
     func annotationMetadata(with annotation: String) -> AnnotationMetadata? {

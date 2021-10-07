@@ -59,19 +59,23 @@ extension String {
     static let `open` = "open"
     static let initializer = "init"
     static let argsHistorySuffix = "ArgValues"
-    static let handlerSuffix = "Handler"
+    static let handlerSuffix = "Handler"=
     static let replaySubject = "ReplaySubject"
     static let replaySubjectCreate = ".create(bufferSize: 1)"
     static let behaviorRelay = "BehaviorRelay"
     static let variable = "Variable"
     static let empty = ".empty()"
+    static let observableEmpty = "Observable.empty()"
+    static let rxObservableEmpty = "RxSwift.Observable.empty()"
     static let `required` = "required"
     static let `convenience` = "convenience"
     static let closureArrow = "->"
     static let moduleColon = "module:"
     static let typealiasColon = "typealias:"
+    static let combineColon = "combine:"
     static let varColon = "var:"
     static let historyColon = "history:"
+    static let modifiersColon = "modifiers:"
     static let `typealias` = "typealias"
     static let annotationArgDelimiter = ";"
     static let subjectSuffix = "Subject"
@@ -139,7 +143,7 @@ extension String {
 
 
     func canBeInitParam(type: String, isStatic: Bool) -> Bool {
-        return !(isStatic || type == .unknownVal || (type.hasSuffix("?") && type.contains(String.closureArrow)) ||  isGenerated(type: Type(type)))
+        return !(isStatic || type == .unknownVal || type.hasPrefix(.anyPublisher) || (type.hasSuffix("?") && type.contains(String.closureArrow)) ||  isGenerated(type: Type(type)))
     }
     
     func isGenerated(type: Type) -> Bool {
@@ -183,12 +187,12 @@ extension StringProtocol {
         return prefix(1).capitalized + dropFirst()
     }
     
-    func shouldParse(with exclusionList: [String]? = nil) -> Bool {
+    func shouldParse(with exclusionList: [String]) -> Bool {
         guard hasSuffix(".swift") else { return false }
-        guard let exlist = exclusionList else { return true }
+        guard !exclusionList.isEmpty else { return true }
         
         if let name = components(separatedBy: ".swift").first {
-            for ex in exlist {
+            for ex in exclusionList {
                 if name.hasSuffix(ex) {
                     return false
                 }
