@@ -166,5 +166,6 @@ extension VariableModel {
         return template
     }
 }
+}
 
 
